@@ -2,6 +2,7 @@ import libvirt
 import csv
 import datetime as dt
 import time
+import tkinter as tk
 
 # Nomes das VMs
 vm_names = ["java11", "java8"]  
@@ -40,29 +41,40 @@ def gather_vm_stats(conn, vm):
         "Caches de Disco (B)": stats_mem.get("disk_caches", 0) # adicionado um valor padrão ao método get
     }
 
-# Abre conexão com qemu:///system
-conn = libvirt.open('qemu:///system')
-if not conn:
-    raise Exception('Falha ao abrir conexão com qemu:///system')
+def start_benchmark():
+    # Abre conexão com qemu:///system
+    conn = libvirt.open('qemu:///system')
+    if not conn:
+        raise Exception('Falha ao abrir conexão com qemu:///system')
 
-# Armazena as VMs
-vms = []
-for name in vm_names:
-    vm = conn.lookupByName(name)
-    if not vm:
-        raise Exception(f'Falha ao encontrar a VM {name}')
-    vms.append(vm)
+    # Armazena as VMs
+    vms = []
+    for name in vm_names:
+        vm = conn.lookupByName(name)
+        if not vm:
+            raise Exception(f'Falha ao encontrar a VM {name}')
+        vms.append(vm)
 
-headers = list(gather_vm_stats(conn, vms[0]).keys())
-rows = []
+    headers = list(gather_vm_stats(conn, vms[0]).keys())
+    rows = []
 
-end_time = time.time() + measurement_time
-while time.time() < end_time:
-    for vm in vms:
-        rows.append(gather_vm_stats(conn, vm))
-    time.sleep(measurement_interval)
+    end_time = time.time() + measurement_time
+    while time.time() < end_time:
+        for vm in vms:
+            rows.append(gather_vm_stats(conn, vm))
+        time.sleep(measurement_interval)
 
-write_csv("benchmark.csv", headers, [list(row.values()) for row in rows])
-conn.close()
-exit(0)
-``
+    write_csv("benchmark.csv", headers, [list(row.values()) for row in rows])
+    conn.close()
+    exit(0)
+
+# Cria a janela principal
+root = tk.Tk()
+root.title("Benchmark VMs")
+
+# Adiciona um botão para iniciar o benchmark
+start_button = tk.Button(root, text="Iniciar Benchmark", command=start_benchmark)
+start_button.pack()
+
+# Inicia o loop de eventos da interface gráfica
+root.mainloop()
