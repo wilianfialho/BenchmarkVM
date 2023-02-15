@@ -1,4 +1,4 @@
-![Badge em Desenvolvimento](http://img.shields.io/static/v1?label=STATUS&message=EM%20DESENVOLVIMENTO&color=GREEN&style=for-the-badge) ![GitHub Org's stars](https://img.shields.io/github/stars/camilafernanda?style=social)
+![Badge em Desenvolvimento](http://img.shields.io/static/v1?label=STATUS&message=EM%20DESENVOLVIMENTO&color=GREEN&style=for-the-badge) ![GitHub Org's stars](https://img.shields.io/github/stars/wilianfialho?style=social)
 
 <h1 align="center"> # BenchmarkVM </h1>
 > :construction: Projeto em Desenvolvimento :construction:
