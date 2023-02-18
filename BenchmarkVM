@@ -78,7 +78,8 @@ def start_benchmark():
 
     # Fecha a conexão com libvirt e encerra o programa
     conn.close()
-    exit(0)
+    print("Benchmark concluído com sucesso!")
+    root.quit()
 
 # Cria a janela principal da interface gráfica
 root = tk.Tk()
