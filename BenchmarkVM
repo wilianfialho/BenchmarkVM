@@ -4,28 +4,31 @@ import csv
 import datetime as dt
 import time
 import tkinter as tk
+from tkinter import ttk
+
+# Criando janela principal Tkinter
+root = tk.Tk()
+root.title("Benchmark")
 
 # Nomes das VMs que serão monitoradas
-vm_names = ["java11", "java8"]  
+vm_names = ["java11", "java8"]
 
 # Tempo de medição em segundos
-measurement_time = 5   
+measurement_time = 5
 
 # Intervalo de medição em segundos
-measurement_interval = 2  
+measurement_interval = 2
 
 # Função para escrever os dados em um arquivo CSV
 def write_csv(filename, headers, rows):
-    with open(filename, 'w', newline='') as file:
-        writer = csv.writer(file)
-        try:
+    try:
+        with open(filename, 'w', newline='') as file:
+            writer = csv.writer(file)
             writer.writerow(headers)
             writer.writerows(rows)
-        except Exception as e:
-            print(f'Erro ao escrever arquivo {filename}: {e}')
-            exit(1)
-        finally:	
-            file.close()
+    except Exception as e:
+        print(f'Erro ao escrever arquivo {filename}: {e}')
+        exit(1)
 
 # Função para coletar as estatísticas de uma VM
 def gather_vm_stats(conn, vm):
@@ -48,16 +51,19 @@ def gather_vm_stats(conn, vm):
 # Define as colunas do cabeçalho da tabela CSV e inicializa a lista de linhas vazia
 def start_benchmark():
     # Abre conexão com qemu:///system
-    conn = libvirt.open('qemu:///system')
-    if not conn:
-        raise Exception('Falha ao abrir conexão com qemu:///system')
+    try:
+        conn = libvirt.open('qemu:///system')
+    except libvirt.libvirtError as e:
+        print(f'Erro ao abrir conexão com qemu:///system: {e}')
+        exit(1)
 
     # Armazena as VMs
     vms = []
     for name in vm_names:
         vm = conn.lookupByName(name)
         if not vm:
-            raise Exception(f'Falha ao encontrar a VM {name}')
+            print(f'Falha ao encontrar a VM {name}')
+            exit(1)
         vms.append(vm)
 
     # Define as colunas do cabeçalho da tabela CSV
@@ -66,28 +72,43 @@ def start_benchmark():
     # Inicializa a lista de linhas vazia
     rows = []
 
+    # Cria a barra de progresso
+    progress_bar = ttk.Progressbar(root, length=200, mode='determinate')
+    progress_bar.pack(pady=10)
+
+    # Adiciona um botão para interromper o benchmark
+    stop_button = ttk.Button(root, text="Parar Benchmark", command=root.quit)
+    stop_button.pack(pady=10)
+
     # Executa o benchmark por um tempo específico com intervalos regulares
-    end_time = time.time() + measurement_time
-    while time.time() < end_time:
-        for vm in vms:
-            rows.append(gather_vm_stats(conn, vm))
-        time.sleep(measurement_interval)
+    try:
+        end_time = time.time() + measurement_time
+        measurement_count = 0
+        while time.time() < end_time:
+            for vm in vms:
+                rows.append(gather_vm_stats(conn, vm))
+                measurement_count += 1
+                progress_bar['value'] = measurement_count / (measurement_time / measurement_interval) * 100
+                root.update_idletasks() # atualiza a interface gráfica
+                time.sleep(measurement_interval)
 
-    # Escreve os dados coletados em um arquivo CSV
-    write_csv("benchmark.csv", headers, [list(row.values()) for row in rows])
+            # Escreve os dados coletados em um arquivo CSV
+            write_csv("benchmark.csv", headers, [list(row.values()) for row in rows])
 
-    # Fecha a conexão com libvirt e encerra o programa
-    conn.close()
-    exit(0)
+    except libvirt.libvirtError as e:
+        print(f'Erro ao conectar com o hypervisor: {e}')
+        exit(1)
 
-# Cria a janela principal da interface gráfica
-root = tk.Tk()
-root.title("Benchmark VMs")
+    except Exception as e:
+        print(f'Ocorreu um erro: {e}')
+        exit(1)
 
-# Adiciona um botão para iniciar o benchmark
-start_button = tk.Button(root, text="Iniciar Benchmark", command=start_benchmark)
-start_button.pack()
+    finally:
+        # Fecha a conexão com libvirt e encerra o programa
+        conn.close()
+        print("Benchmark concluído com sucesso!")
+        root.quit()
 
-# Inicia o loop de eventos da interface gráfica
-root.mainloop()
+# Chama a função para iniciar o benchmark
+start_benchmark()
 
