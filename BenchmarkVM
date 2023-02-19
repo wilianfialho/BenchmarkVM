@@ -4,6 +4,7 @@ import csv
 import datetime as dt
 import time
 import tkinter as tk
+from tkinter import ttk
 
 # Nomes das VMs que serão monitoradas
 vm_names = ["java11", "java8"]  
@@ -60,35 +61,32 @@ def start_benchmark():
             raise Exception(f'Falha ao encontrar a VM {name}')
         vms.append(vm)
 
-    # Define as colunas do cabeçalho da tabela CSV
-    headers = list(gather_vm_stats(conn, vms[0]).keys())
+# Define as colunas do cabeçalho da tabela CSV
+headers = list(gather_vm_stats(conn, vms[0]).keys())
 
-    # Inicializa a lista de linhas vazia
-    rows = []
+# Inicializa a lista de linhas vazia
+rows = []
 
-    # Executa o benchmark por um tempo específico com intervalos regulares
-    end_time = time.time() + measurement_time
-    while time.time() < end_time:
-        for vm in vms:
-            rows.append(gather_vm_stats(conn, vm))
+# Cria a barra de progresso
+progress_bar = tk.ttk.Progressbar(root, length=200, mode='determinate')
+progress_bar.pack(pady=10)
+
+# Executa o benchmark por um tempo específico com intervalos regulares
+end_time = time.time() + measurement_time
+measurement_count = 0
+while time.time() < end_time:
+    for vm in vms:
+        rows.append(gather_vm_stats(conn, vm))
+        measurement_count += 1
+        progress_bar['value'] = measurement_count / (measurement_time / measurement_interval) * 100
+        root.update_idletasks() # atualiza a interface gráfica
         time.sleep(measurement_interval)
 
-    # Escreve os dados coletados em um arquivo CSV
-    write_csv("benchmark.csv", headers, [list(row.values()) for row in rows])
+# Escreve os dados coletados em um arquivo CSV
+write_csv("benchmark.csv", headers, [list(row.values()) for row in rows])
 
-    # Fecha a conexão com libvirt e encerra o programa
-    conn.close()
-    print("Benchmark concluído com sucesso!")
-    root.quit()
-
-# Cria a janela principal da interface gráfica
-root = tk.Tk()
-root.title("Benchmark VMs")
-
-# Adiciona um botão para iniciar o benchmark
-start_button = tk.Button(root, text="Iniciar Benchmark", command=start_benchmark)
-start_button.pack()
-
-# Inicia o loop de eventos da interface gráfica
-root.mainloop()
+# Fecha a conexão com libvirt e encerra o programa
+conn.close()
+print("Benchmark concluído com sucesso!")
+root.quit()
 
