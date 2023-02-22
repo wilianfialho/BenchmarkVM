@@ -34,6 +34,7 @@ def write_csv(filename, headers, rows):
 def gather_vm_stats(conn, vm):
     stats_cpu = vm.getCPUStats(True)
     stats_mem = vm.memoryStats()
+    stats_disk = vm.blockStats("vda")
     return {
         "VM": vm.name(), # Nome da VM sendo monitorada
         "Horário de Medição": dt.datetime.now().strftime("%H:%M:%S"), # Data e hora do momento da medição
@@ -44,7 +45,7 @@ def gather_vm_stats(conn, vm):
         "Memória Não Utilizada (B)": stats_mem.get("unused"), # Quantidade de memória não utilizada (em bytes)
         "Memória Disponível (B)": stats_mem.get("available"), # Quantidade de memória disponível (em bytes)
         "Memória Usável (B)": stats_mem.get("usable"), # Quantidade de memória usável (em bytes)
-        "Caches de Disco (B)": stats_mem.get("disk_caches", 0) # Quantidade de caches de disco usados (em bytes)
+        "Caches de Disco (B)": stats_mem.get("disk_caches", 0), # Quantidade de caches de disco usados (em bytes)
         "Espaço em Disco Alocado (B)": stats_disk[0], # Quantidade de espaço em disco alocado (em bytes)
         "Espaço em Disco Livre (B)": stats_disk[1], # Quantidade de espaço em disco livre (em bytes)
         "Leituras de Disco": stats_disk[2], # Número de operações de leitura de disco
