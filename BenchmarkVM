@@ -1,4 +1,3 @@
-# Importando as bibliotecas necessárias
 import libvirt
 import csv
 import datetime as dt
@@ -9,16 +8,19 @@ import threading
 
 class Benchmark:
     def __init__(self, vm_names, measurement_time, measurement_interval):
+        # Inicializa a classe Benchmark com nomes de VMs, tempo total de medição e intervalo entre medições.
         self.vm_names = vm_names
         self.measurement_time = measurement_time
         self.measurement_interval = measurement_interval
         self.stats = {}
         self.rows = []
         self.progress = 0
+        self.monitoring = False
+        self.cpu_threshold = 80 * 1e9  # Exemplo de limite de uso de CPU em nanosegundos
+        self.mem_threshold = 1e9  # Exemplo de limite de uso de memória em bytes
 
-  
-    # Função para escrever os dados em um arquivo CSV 
     def write_csv(self, filename, headers, rows):
+        # Escreve as estatísticas coletadas em um arquivo CSV.
         try:
             with open(filename, 'w', newline='') as file:
                 writer = csv.writer(file)
@@ -27,8 +29,8 @@ class Benchmark:
         except Exception as e:
             print(f'Erro ao escrever arquivo {filename}: {e}')
 
-    # Função para coletar as estatísticas de uma VM 
-    def gather_vm_stats(self, conn, vm):
+    def gather_vm_stats(self, vm):
+        # Coleta estatísticas de CPU, memória e disco de uma VM específica.
         stats_cpu = vm.getCPUStats(True)
         stats_mem = vm.memoryStats()
         stats_disk = vm.blockStats("vda")
@@ -49,16 +51,29 @@ class Benchmark:
             "Escritas de Disco": stats_disk[3]
         }
 
-    # Função para imprimir estatísticas no terminal
     def print_stats_to_terminal(self):
+        # Imprime as estatísticas coletadas no terminal.
         print("Estatísticas coletadas:")
         for vm_name, vm_stats in self.stats.items():
             print(f"\n{vm_name}:")
             for key, value in vm_stats.items():
                 print(f"{key}: {value}")
 
-    def start_benchmark(self, progress_var, callback):
-        def run_benchmark():
+    def check_alerts(self, vm_stats):
+        # Verifica se alguma estatística ultrapassa os limites definidos e envia alertas.
+        if vm_stats['Tempo de CPU (ns)'] > self.cpu_threshold:
+            self.send_alert(f"Alerta: Uso elevado de CPU na VM {vm_stats['VM']}")
+        if vm_stats['Memória Alocada (B)'] > self.mem_threshold:
+            self.send_alert(f"Alerta: Uso elevado de Memória na VM {vm_stats['VM']}")
+
+    def send_alert(self, message):
+        # Envia um alerta (por exemplo, imprime uma mensagem de alerta no terminal).
+        print(message)
+        # Aqui você pode adicionar código para enviar o alerta, como e-mail ou notificação na GUI.
+
+    def start_real_time_monitoring(self, progress_var, callback):
+        # Inicia o monitoramento em tempo real das VMs.
+        def update_stats():
             try:
                 conn = libvirt.open('qemu:///system')
             except libvirt.libvirtError as e:
@@ -67,66 +82,84 @@ class Benchmark:
 
             try:
                 vms = [conn.lookupByName(name) for name in self.vm_names]
-                headers = list(self.gather_vm_stats(conn, vms[0]).keys())
+                headers = list(self.gather_vm_stats(vms[0]).keys())
             except libvirt.libvirtError as e:
                 print(f'Erro ao localizar a VM: {e}')
                 return
 
             try:
-                end_time = time.time() + self.measurement_time
-                measurement_count = 0
                 total_measurements = (self.measurement_time // self.measurement_interval) * len(vms)
+                measurement_count = 0
 
-                while time.time() < end_time:
+                while self.monitoring:
                     for vm in vms:
-                        vm_stats = self.gather_vm_stats(conn, vm)
+                        vm_stats = self.gather_vm_stats(vm)
                         self.stats[vm.name()] = vm_stats
                         self.rows.append(vm_stats)
+                        self.check_alerts(vm_stats)
                         measurement_count += 1
                         self.progress = (measurement_count / total_measurements) * 100
                         progress_var.set(self.progress)
                         time.sleep(self.measurement_interval)
-
-                self.write_csv("benchmark.csv", headers, [list(row.values()) for row in self.rows])
 
             except Exception as e:
                 print(f'Ocorreu um erro: {e}')
             finally:
                 conn.close()
                 self.print_stats_to_terminal()
-                print("Benchmark concluído com sucesso!")
+                print("Monitoramento em tempo real concluído com sucesso!")
                 callback()
 
-        benchmark_thread = threading.Thread(target=run_benchmark)
-        benchmark_thread.start()
+        self.monitoring = True
+        self.monitor_thread = threading.Thread(target=update_stats)
+        self.monitor_thread.start()
+
+    def stop_real_time_monitoring(self):
+        # Para o monitoramento em tempo real.
+        self.monitoring = False
+        self.monitor_thread.join()
 
 class BenchmarkGUI:
     def __init__(self, root, benchmark):
+        # Inicializa a interface gráfica com o Tkinter e configura os widgets.
         self.root = root
         self.benchmark = benchmark
         self.progress_var = tk.DoubleVar()
         self.create_widgets()
 
     def create_widgets(self):
+        # Cria os botões e a barra de progresso.
+        self.start_button = ttk.Button(self.root, text="Iniciar Monitoramento", command=self.start_monitoring)
+        self.start_button.pack(pady=10)
         self.progress_bar = ttk.Progressbar(self.root, length=200, mode='determinate', variable=self.progress_var)
         self.progress_bar.pack(pady=10)
-        self.stop_button = ttk.Button(self.root, text="Parar Benchmark", command=self.root.quit)
+        self.stop_button = ttk.Button(self.root, text="Parar Monitoramento", command=self.stop_monitoring)
         self.stop_button.pack(pady=10)
 
-    def start(self):
-        self.benchmark.start_benchmark(self.progress_var, self.root.quit)
+    def start_monitoring(self):
+        # Inicia o monitoramento quando o botão "Iniciar Monitoramento" é pressionado.
+        self.start_button.config(state=tk.DISABLED)
+        self.benchmark.start_real_time_monitoring(self.progress_var, self.enable_start_button)
+
+    def stop_monitoring(self):
+        # Para o monitoramento quando o botão "Parar Monitoramento" é pressionado.
+        self.benchmark.stop_real_time_monitoring()
+        self.enable_start_button()
+
+    def enable_start_button(self):
+        # Habilita o botão "Iniciar Monitoramento".
+        self.start_button.config(state=tk.NORMAL)
 
 # Criando janela principal Tkinter
 root = tk.Tk()
-root.title("Benchmark")
+root.title("Monitoramento em Tempo Real")
 
 # Configurando e iniciando o benchmark
 vm_names = ["java11", "java8"]
-measurement_time = 5
+measurement_time = 60  # 1 minuto para teste
 measurement_interval = 2
 benchmark = Benchmark(vm_names, measurement_time, measurement_interval)
 app = BenchmarkGUI(root, benchmark)
-app.start()
 
 # Inicia o loop do Tkinter
 root.mainloop()
