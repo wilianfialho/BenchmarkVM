@@ -1,46 +1,72 @@
 ![Badge em Desenvolvimento](http://img.shields.io/static/v1?label=STATUS&message=EM%20DESENVOLVIMENTO&color=GREEN&style=for-the-badge) ![GitHub Org's stars](https://img.shields.io/github/stars/wilianfialho?style=social)
 ![BenchmarkVM](https://user-images.githubusercontent.com/4766326/219923377-574378a5-6a3d-4064-9616-1fbdf0c3ce4d.png)
-<h1 align="center"> # BenchmarkVM </h1>
+
+<h1 align="center"> BenchmarkVM </h1>
 > :construction: Projeto em Desenvolvimento :construction:
 
-Este código é utilizado para a medição de recursos de máquinas virtuais. Ele utiliza a biblioteca libvirt para conectar-se ao host e obter informações sobre as VMs especificadas.
+BenchmarkVM é uma ferramenta para medir o desempenho de máquinas virtuais (VMs) utilizando a biblioteca `libvirt`. O projeto coleta estatísticas detalhadas sobre o uso de CPU, memória e disco das VMs especificadas e oferece uma interface gráfica para monitoramento em tempo real.
 
-As informações coletadas incluem o nome da VM, horário da medição, tempo de CPU, tempo de sistema, tempo de usuário, memória alocada, memória não utilizada, memória disponível, memória usável e caches de disco.
+## :hammer: Funcionalidades
 
-O código salva esses dados em um arquivo CSV, com o nome "benchmark.csv". A medição de recursos é realizada por um período de tempo especificado (em segundos) e o intervalo entre medições também pode ser especificado.
+- **Medição de Estatísticas**: Coleta dados de desempenho das VMs, incluindo:
+  - Nome da VM
+  - Horário da medição
+  - Tempo de CPU, sistema e usuário
+  - Memória alocada, não utilizada, disponível, usável e caches de disco
+  - Espaço em disco alocado e livre, além de leituras e escritas de disco
 
-Para usar o código, basta especificar os nomes das VMs desejadas na lista vm_names e configurar o tempo de medição e o intervalo de medição. Depois, basta executar o código e verificar o arquivo "benchmark.csv" para os resultados.
+- **Escrita em CSV**: Salva os resultados em um arquivo CSV chamado "benchmark.csv".
 
+- **Monitoramento em Tempo Real**: Permite iniciar e parar o monitoramento em tempo real através de uma interface gráfica com o Tkinter, mostrando o progresso em uma barra de progresso.
 
-# :hammer: Funcionalidades do BenchmarkVM
+- **Alertas de Recursos**: Verifica se o uso de CPU ou memória ultrapassa os limites especificados e envia alertas.
 
-- `Funcionalidade 1`: Medição de estatísticas de desempenho de máquinas virtuais (VMs) com o nome listado em "vm_names".
-- `Funcionalidade 2`: Escrita dos resultados em um arquivo CSV.
-- `Funcionalidade 3`: Intervalo de tempo da medição é especificado em "measurement_time".
-- `Funcionalidade 3a`: Intervalo entre medições é especificado em "measurement_interval".
-- `Funcionalidade 4`: As estatísticas coletadas incluem: nome da VM, horário de medição, tempo de CPU, tempo de sistema, tempo de usuário, memória alocada, memória não utilizada, memória disponível, memória usável, e caches de disco.
+## 🖥️ Tecnologias Utilizadas
 
+- **LibVirt**: Biblioteca para interagir com o hipervisor.
+- **CSV**: Para armazenamento dos dados coletados.
+- **Python**: Linguagem de programação usada para o script.
+- **Tkinter**: Biblioteca para a interface gráfica.
+- **DateTime**: Para manipulação e formatação de datas e horas.
+- **Time**: Para controle de intervalos e temporização.
 
+## 🛠️ Como Rodar o Projeto
 
-# 🖥️ Tecnologias Utilizadas
+1. **Instalar Python**: Certifique-se de que o Python está instalado na sua máquina. É recomendado usar Python 3.7 ou superior.
 
-- `LibVirt`
-- `CSV`
-- `Python`
-- `DateTime`
-- `Time`
+2. **Instalar Dependências**:
+   - Instale a biblioteca `libvirt` usando o comando:
+     ```bash
+     pip install libvirt-python
+     ```
 
+3. **Clonar o Repositório**:
+   - Clone o repositório do projeto do GitHub:
+     ```bash
+     git clone https://github.com/seu-usuario/benchmarkvm.git
+     ```
+   - Navegue para o diretório do projeto:
+     ```bash
+     cd benchmarkvm
+     ```
 
-# 🛠️ Abrir e rodar o projeto
+4. **Executar o Script**:
+   - Execute o script Python para iniciar o monitoramento:
+     ```bash
+     python nome_do_arquivo.py
+     ```
+   - Substitua `nome_do_arquivo.py` pelo nome real do arquivo Python.
 
-- Instalar o Python na versão necessária para este projeto.
+5. **Verificar Resultados**:
+   - Após a execução, verifique o arquivo "benchmark.csv" na pasta do projeto para visualizar as informações coletadas.
 
-- Instalar a biblioteca libvirt, que é utilizada para se conectar ao hipervisor.
+## 📷 Exemplo de Uso
 
-- Clonar o repositório do código do projeto do Github.
+1. **Configuração**: Edite a lista `vm_names` com os nomes das VMs que deseja monitorar, e ajuste `measurement_time` e `measurement_interval` conforme necessário.
 
-- Abrir o terminal na pasta do projeto.
+2. **Interface Gráfica**: Use a interface gráfica fornecida para iniciar e parar o monitoramento em tempo real. A barra de progresso exibirá o andamento do monitoramento.
 
-- Executar o arquivo de script Python (nome do arquivo é o mesmo do código apresentado acima).
+## :warning: Avisos
 
-- Verificar o arquivo CSV gerado com o nome "benchmark.csv", que contém as informações coletadas das VMs.
+- Certifique-se de que as VMs estão configuradas corretamente e que a conexão com o hipervisor está funcionando.
+- Os limites de uso de CPU e memória são exemplos e podem ser ajustados conforme a necessidade.
