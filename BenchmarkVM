@@ -1,145 +1,127 @@
-# Importando as bibliotecas necessárias
-import libvirt 
-import csv 
-import datetime as dt 
-import time 
-import tkinter as tk 
-from tkinter import ttk 
-  
+import libvirt
+import csv
+import datetime as dt
+import time
+import tkinter as tk
+from tkinter import ttk
+import threading
+
 class Benchmark:
-    def __init__(self):
-        self.vm_names = ["java11", "java8"]
-        self.measurement_time = 5
-        self.measurement_interval = 2
+    def __init__(self, vm_names, measurement_time, measurement_interval):
+        self.vm_names = vm_names
+        self.measurement_time = measurement_time
+        self.measurement_interval = measurement_interval
         self.stats = {}
         self.rows = []
-  
-    # Função para escrever os dados em um arquivo CSV 
-    def write_csv(self, filename, headers, rows): 
-        try: 
-            with open(filename, 'w', newline='') as file: 
-                writer = csv.writer(file) 
-                writer.writerow(headers) 
-                writer.writerows(rows) 
-        except Exception as e: 
-            print(f'Erro ao escrever arquivo {filename}: {e}') 
-            exit(1) 
-  
-    # Função para coletar as estatísticas de uma VM 
-    def gather_vm_stats(self, conn, vm): 
-        stats_cpu = vm.getCPUStats(True) 
-        stats_mem = vm.memoryStats() 
-        stats_disk = vm.blockStats("vda") 
-        return { 
-            "VM": vm.name(), # Nome da VM sendo monitorada 
-            "Horário de Medição": dt.datetime.now().strftime("%H:%M:%S"), # Data e hora do momento da medição 
-            "Tempo de CPU (ns)": stats_cpu[0]['cpu_time'], # Tempo total de CPU usado pela VM (em nanosegundos) 
-            "Tempo de Sistema (ns)": stats_cpu[0]['system_time'], # Tempo total do sistema usado pela VM (em nanosegundos) 
-            "Tempo de Usuário (ns)": stats_cpu[0]['user_time'], # Tempo total de usuário usado pela VM (em nanosegundos) 
-            "Memória Alocada (B)": stats_mem.get("actual", 0), # Quantidade de memória alocada (em bytes) 
-            "Memória Não Utilizada (B)": stats_mem.get("unused", 0), # Quantidade de memória não utilizada (em bytes) 
-            "Memória Disponível (B)": stats_mem.get("available", 0), # Quantidade de memória disponível (em bytes) 
-            "Memória Usável (B)": stats_mem.get("usable", 0), # Quantidade de memória usável (em bytes) 
-            "Caches de Disco (B)": stats_mem.get("disk_caches", 0), # Quantidade de caches de disco usados (em bytes) 
-            "Espaço em Disco Alocado (B)": stats_disk[0], # Quantidade de espaço em disco alocado (em bytes) 
-            "Espaço em Disco Livre (B)": stats_disk[1], # Quantidade de espaço em disco livre (em bytes) 
-            "Leituras de Disco": stats_disk[2], # Número de operações de leitura de disco 
-            "Escritas de Disco": stats_disk[3] # Número de operações de escrita de disco 
-        } 
+        self.progress = 0
 
-    # Função para imprimir estatísticas no terminal
+    def write_csv(self, filename, headers, rows):
+        try:
+            with open(filename, 'w', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(headers)
+                writer.writerows(rows)
+        except Exception as e:
+            print(f'Erro ao escrever arquivo {filename}: {e}')
+
+    def gather_vm_stats(self, conn, vm):
+        stats_cpu = vm.getCPUStats(True)
+        stats_mem = vm.memoryStats()
+        stats_disk = vm.blockStats("vda")
+        return {
+            "VM": vm.name(),
+            "Horário de Medição": dt.datetime.now().strftime("%H:%M:%S"),
+            "Tempo de CPU (ns)": stats_cpu[0]['cpu_time'],
+            "Tempo de Sistema (ns)": stats_cpu[0]['system_time'],
+            "Tempo de Usuário (ns)": stats_cpu[0]['user_time'],
+            "Memória Alocada (B)": stats_mem.get("actual", 0),
+            "Memória Não Utilizada (B)": stats_mem.get("unused", 0),
+            "Memória Disponível (B)": stats_mem.get("available", 0),
+            "Memória Usável (B)": stats_mem.get("usable", 0),
+            "Caches de Disco (B)": stats_mem.get("disk_caches", 0),
+            "Espaço em Disco Alocado (B)": stats_disk[0],
+            "Espaço em Disco Livre (B)": stats_disk[1],
+            "Leituras de Disco": stats_disk[2],
+            "Escritas de Disco": stats_disk[3]
+        }
+
     def print_stats_to_terminal(self):
         print("Estatísticas coletadas:")
         for vm_name, vm_stats in self.stats.items():
             print(f"\n{vm_name}:")
             for key, value in vm_stats.items():
                 print(f"{key}: {value}")
-    
-    # Função para criar barra de progresso
-    def create_progress_bar(self):
-        progress_bar = ttk.Progressbar(root, length=200, mode='determinate') 
-        progress_bar.pack(pady=10)
-        return progress_bar
-  
-    # Função para criar botão de parar o benchmark
-    def create_stop_button(self):
-        stop_button = ttk.Button(root, text="Parar Benchmark", command=root.quit) 
-        stop_button.pack(pady=10) 
-        return stop_button
 
-    # Função principal do benchmark
-    def start_benchmark(self): 
-        # Abre conexão com qemu:///system 
-        try: 
-            conn = libvirt.open('qemu:///system') 
-        except libvirt.libvirtError as e: 
-            print(f'Erro ao abrir conexão com qemu:///system: {e}') 
-            exit(1)
-        
-        # Inicializa as estatísticas das VMs
-        for name in self.vm_names:
-            self.stats[name] = {}
+    def start_benchmark(self, progress_var, callback):
+        def run_benchmark():
+            try:
+                conn = libvirt.open('qemu:///system')
+            except libvirt.libvirtError as e:
+                print(f'Erro ao abrir conexão com qemu:///system: {e}')
+                return
 
-        # Armazena as VMs e define as colunas do cabeçalho da tabela CSV
-        try:
-            vms = [] 
-            for name in self.vm_names: 
-                vm = conn.lookupByName(name) 
-                if not vm: 
-                    print(f'Falha ao encontrar a VM {name}') 
-                    exit(1) 
-                vms.append(vm)
-                self.stats[name] = {}
+            try:
+                vms = [conn.lookupByName(name) for name in self.vm_names]
+                headers = list(self.gather_vm_stats(conn, vms[0]).keys())
+            except libvirt.libvirtError as e:
+                print(f'Erro ao localizar a VM: {e}')
+                return
 
-            headers = list(self.gather_vm_stats(conn, vms[0]).keys()) 
+            try:
+                end_time = time.time() + self.measurement_time
+                measurement_count = 0
+                total_measurements = (self.measurement_time // self.measurement_interval) * len(vms)
 
-        except libvirt.libvirtError as e: 
-            print(f'Erro ao localizar a VM: {e}') 
-            exit(1) 
-  
-        # Cria a barra de progresso e botão para interromper
-        progress_bar = self.create_progress_bar()
-        stop_button = self.create_stop_button()
+                while time.time() < end_time:
+                    for vm in vms:
+                        vm_stats = self.gather_vm_stats(conn, vm)
+                        self.stats[vm.name()] = vm_stats
+                        self.rows.append(vm_stats)
+                        measurement_count += 1
+                        self.progress = (measurement_count / total_measurements) * 100
+                        progress_var.set(self.progress)
+                        time.sleep(self.measurement_interval)
 
-        # Executa o benchmark por um tempo específico com intervalos regulares 
-        try: 
-            end_time = time.time() + self.measurement_time 
-            measurement_count = 0 
-            while time.time() < end_time: 
-                for vm in vms: 
-                    vm_stats = self.gather_vm_stats(conn, vm)
-                    self.stats[vm.name()].update(vm_stats)
-                    self.rows.append(vm_stats) 
-                    measurement_count += 1 
-                    progress_bar['value'] = measurement_count / (self.measurement_time / self.measurement_interval) * 100 
-                    root.update_idletasks() # atualiza a interface gráfica 
-                    time.sleep(self.measurement_interval) 
-  
-                # Escreve os dados coletados em um arquivo CSV 
-                self.write_csv("benchmark.csv", headers, [list(row.values()) for row in self.rows]) 
-  
-        except libvirt.libvirtError as e: 
-            print(f'Erro ao conectar com o hypervisor: {e}') 
-            exit(1) 
-        except Exception as e: 
-            print(f'Ocorreu um erro: {e}') 
-            exit(1) 
-  
-        finally: 
-            # Fecha a conexão com libvirt e encerra o programa 
-            conn.close() 
-            self.print_stats_to_terminal()
-            print("Benchmark concluído com sucesso!") 
-            root.quit() 
+                self.write_csv("benchmark.csv", headers, [list(row.values()) for row in self.rows])
 
-# Criando janela principal Tkinter 
-root = tk.Tk() 
+            except Exception as e:
+                print(f'Ocorreu um erro: {e}')
+            finally:
+                conn.close()
+                self.print_stats_to_terminal()
+                print("Benchmark concluído com sucesso!")
+                callback()
+
+        benchmark_thread = threading.Thread(target=run_benchmark)
+        benchmark_thread.start()
+
+class BenchmarkGUI:
+    def __init__(self, root, benchmark):
+        self.root = root
+        self.benchmark = benchmark
+        self.progress_var = tk.DoubleVar()
+        self.create_widgets()
+
+    def create_widgets(self):
+        self.progress_bar = ttk.Progressbar(self.root, length=200, mode='determinate', variable=self.progress_var)
+        self.progress_bar.pack(pady=10)
+        self.stop_button = ttk.Button(self.root, text="Parar Benchmark", command=self.root.quit)
+        self.stop_button.pack(pady=10)
+
+    def start(self):
+        self.benchmark.start_benchmark(self.progress_var, self.root.quit)
+
+# Criando janela principal Tkinter
+root = tk.Tk()
 root.title("Benchmark")
 
-# Chama a função para iniciar o benchmark 
-b = Benchmark()
-b.start_benchmark()
+# Configurando e iniciando o benchmark
+vm_names = ["java11", "java8"]
+measurement_time = 5
+measurement_interval = 2
+benchmark = Benchmark(vm_names, measurement_time, measurement_interval)
+app = BenchmarkGUI(root, benchmark)
+app.start()
 
-# Inicia o loop do Tkinter 
+# Inicia o loop do Tkinter
 root.mainloop()
-
